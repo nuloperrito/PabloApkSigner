@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'com.pablo'
+version = '1.2'
+
+repositories {
+    mavenCentral()
+}
+
+def swtPlatform() {
+    def osName = System.getProperty("os.name").toLowerCase()
+    def osArch = System.getProperty("os.arch").toLowerCase()
+
+    if (osName.contains("win")) {
+        // Windows
+        return "win32.win32.x86_64" // Compatible con la mayoría de Windows de 64 bits
+    } else if (osName.contains("mac")) {
+        // macOS (normalmente Cocoa)
+        if (osArch.contains("aarch64") || osArch.contains("arm64")) {
+            return "cocoa.macosx.aarch64" // ARM Mac
+        } else {
+            return "cocoa.macosx.x86_64" // Intel Mac
+        }
+    } else if (osName.contains("linux")) {
+        // Linux (normalmente GTK)
+        return "gtk.linux.x86_64" // Compatible con la mayoría de distribuciones de Linux de 64 bits
+    } else {
+        throw new Exception("Unsupported OS for SWT: ${osName}")
+    }
+}
+
+configurations.all {
+    // This is to resolve the unresolvable ${osgi.platform} in the SWT dependency.
+    resolutionStrategy {
+        dependencySubstitution {
+            // Cuando la dependencia de la solicitud es 'org.eclipse.platform:org.eclipse.swt'
+            substitute(module('org.eclipse.platform:org.eclipse.swt'))
+            // Reemplácela con la dependencia de la plataforma específica
+                    .using(module("org.eclipse.platform:org.eclipse.swt.${swtPlatform()}:3.128.0"))
+                    .because("SWT dependency uses an unresolvable \${osgi.platform} variable in its POM, replacing with platform-specific version.")
+        }
+    }
+}
+
+dependencies {
+    implementation 'commons-cli:commons-cli:1.6.0'
+    implementation 'org.conscrypt:conscrypt-openjdk-uber:2.5.2'
+    implementation 'org.eclipse.platform:org.eclipse.swt:3.128.0'
+}
+
+tasks.named('shadowJar') {
+    manifest {
+        attributes 'Main-Class': 'com.pablo.apksigner.SignTool'
+    }
+    archiveFileName.set("${project.name}-${archiveVersion.get()}.jar")
+}
